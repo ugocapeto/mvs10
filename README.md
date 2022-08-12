@@ -2,7 +2,7 @@
 
 Written and tested on Ubuntu 22.04.
 
-mvs10 builds a dense reconstruction of a 3D scene from a set of pictures (taken with a camera in photo mode or extracted from a video).
+mvs10 builds a dense reconstruction of a 3D scene from a set of pictures.
 
 mvs10's workflow is as follows:
 - Initialize the dense with 3D reconstruction with the sparse 3D reconstruction contained in the nvm file
