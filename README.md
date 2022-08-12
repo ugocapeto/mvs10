@@ -23,10 +23,10 @@ Info about mvs10 (theory behind it and how to use it) can be found here:
 
 Dependencies (check the Makefile in main):
 
-"common" repo
+common repo
 
-"er9b" repo
+dmag5 repo
 
-"dmag5" repo
+er9b repo
 
-"sfm10" repo
+sfm10 repo
