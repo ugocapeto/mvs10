@@ -1,0 +1,348 @@
+#include "header.h"
+
+void mvs_add_match(
+ char **image_filename_arr,
+ int *width_arr,
+ int *height_arr,
+ double *focal_length_arr,
+ int camera_nbr,
+ sfm_camera_matrix_struct *camera_matrix_arr,
+ int camera_matrix_nbr,
+ char *filename1,
+ char *filename2,
+ int *image1_arr,
+ int *image2_arr,
+ int camera1_ind,
+ int camera2_ind,
+ int i1,
+ int j1,
+ int i2,
+ int j2,
+ sfm_threedpoint_struct **pthreedpoint_arr,
+ int *pthreedpoint_nbr,
+ int ***ppixel2threedpoint_arr
+)
+
+{
+
+ sfm_threedpoint_struct *threedpoint_arr;
+ int threedpoint_nbr;
+ int **pixel2threedpoint_arr;
+ int width1;
+ int height1;
+ int width2;
+ int height2;
+ int camera_matrix_ind1;
+ int camera_matrix_ind2;
+ double P1[3*4];
+ double K1[3*3];
+ double R1[3*3];
+ double t1[3];
+ double P2[3*4];
+ double K2[3*3];
+ double R2[3*3];
+ double t2[3];
+ int pixel1;
+ int pixel2;
+ double x1;
+ double y1;
+ double x2;
+ double y2;
+ int threedpoint_ind1;
+ int threedpoint_ind2;
+ int threedpoint_ind;
+ double xyz4[4];
+ double xyz[3];
+ int rgb1[3];
+ int rgb2[3];
+ int cind;
+ double val_dbl;
+ int val_int;
+ int rgb[3];
+ sfm_imagepoint_struct *imagepoint_arr;
+ int imagepoint_nbr;
+ sfm_imagepoint_struct imagepoint;
+ int imagepoint_ind;
+ int feat1_ind;
+ int feat2_ind;
+
+ threedpoint_arr= (*pthreedpoint_arr);
+ threedpoint_nbr= (*pthreedpoint_nbr);
+ pixel2threedpoint_arr= (*ppixel2threedpoint_arr);
+
+ width1= width_arr[camera1_ind];
+ height1= height_arr[camera1_ind];
+
+ width2= width_arr[camera2_ind];
+ height2= height_arr[camera2_ind];
+
+ /*
+ Get the camera matrix 1
+ */
+
+ camera_matrix_ind1= camera1_ind;
+ sfm_get_camera_matrix(
+  camera_matrix_arr,
+  camera_matrix_nbr,
+  camera_matrix_ind1,
+  &camera1_ind,
+  P1,
+  K1,
+  R1,
+  t1
+ );
+
+ /*
+ Get the camera matrix 2
+ */
+
+ camera_matrix_ind2= camera2_ind;
+ sfm_get_camera_matrix(
+  camera_matrix_arr,
+  camera_matrix_nbr,
+  camera_matrix_ind2,
+  &camera2_ind,
+  P2,
+  K2,
+  R2,
+  t2
+ );
+
+ pixel1= i1*width1+j1;
+ pixel2= i2*width2+j2;
+
+ x1= (double)j1;
+ y1= (double)i1;
+ x2= (double)j2;
+ y2= (double)i2;
+
+ /*
+ Let's see if there is a 3D point associated with either pixel
+ */
+
+ threedpoint_ind1= pixel2threedpoint_arr[camera1_ind][pixel1];
+ threedpoint_ind2= pixel2threedpoint_arr[camera2_ind][pixel2];
+
+ if ( threedpoint_ind1 != -1 &&
+      threedpoint_ind2 != -1 ) {
+
+    if ( threedpoint_ind2 == threedpoint_ind1 ) {
+
+       /*
+       Do nothing
+       */
+
+       goto END;
+    }
+
+    if ( threedpoint_ind2 != threedpoint_ind1 ) {
+
+       /*
+       Merge the two 3D points
+       */ 
+
+       mvs_merge_threedpoints(
+        image_filename_arr,
+        width_arr,
+        height_arr,
+        threedpoint_ind1,
+        threedpoint_ind2,
+        threedpoint_arr,
+        threedpoint_nbr,
+        pixel2threedpoint_arr
+       );
+
+       goto END;
+    }
+ }
+
+ if ( threedpoint_ind1 != -1 &&
+      threedpoint_ind2 == -1 ) {
+
+    /*
+    Add image point on camera2_ind to 3D point 1
+    */
+
+    feat2_ind=-1;
+    mvs_add_imagepoint_to_threedpoint(
+     camera2_ind,
+     feat2_ind,
+     x2,
+     y2,
+     pixel2,
+     threedpoint_ind1,
+     pixel2threedpoint_arr,
+     threedpoint_arr,
+     threedpoint_nbr
+    );
+
+    goto END;
+ }
+
+ if ( threedpoint_ind1 == -1 &&
+      threedpoint_ind2 != -1 ) {
+
+    /*
+    Add image point on camera1_ind to 3D point 2
+    */
+
+    feat1_ind=-1;
+    mvs_add_imagepoint_to_threedpoint(
+     camera1_ind,
+     feat1_ind,
+     x1,
+     y1,
+     pixel1,
+     threedpoint_ind2,
+     pixel2threedpoint_arr,
+     threedpoint_arr,
+     threedpoint_nbr
+    );
+
+    goto END;
+ }
+
+ /*
+ If here,
+ image point on camera1_ind does not reference a 3D point
+ image point on camera2_ind does not reference a 3D point
+ */
+
+ /*
+ if ( threedpoint_ind1 == -1 &&
+      threedpoint_ind2 == -1 ) {
+ */
+
+ /*
+ Create a new 3D point
+ */
+
+ if ( threedpoint_nbr == 0 ) {
+    threedpoint_arr= (sfm_threedpoint_struct *)calloc(threedpoint_nbr+1,sizeof(sfm_threedpoint_struct));
+ }
+ else {
+    threedpoint_arr= (sfm_threedpoint_struct *)realloc(threedpoint_arr,(threedpoint_nbr+1)*sizeof(sfm_threedpoint_struct));
+ }
+ threedpoint_ind= threedpoint_nbr;
+ threedpoint_nbr++;
+
+ /*
+ Compute the location of the 3D point
+ */
+
+ compute_linear_triangulation_two_cameras(
+  P1,
+  P2,
+  x1,
+  y1,
+  x2,
+  y2,
+  xyz4
+ );
+
+ /*
+ Go from homogeneous to inhomogeneous
+ */
+
+ xyz[0]= xyz4[0]/xyz4[3];
+ xyz[1]= xyz4[1]/xyz4[3];
+ xyz[2]= xyz4[2]/xyz4[3];
+
+ /*
+ Compute color of 3D point
+ */ 
+
+ rgb1[0]= image1_arr[pixel1*3+0];
+ rgb1[1]= image1_arr[pixel1*3+1];
+ rgb1[2]= image1_arr[pixel1*3+2];
+
+ rgb2[0]= image2_arr[pixel2*3+0];
+ rgb2[1]= image2_arr[pixel2*3+1];
+ rgb2[2]= image2_arr[pixel2*3+2];
+
+ for ( cind= 0 ; cind< 3 ; cind++ ) {
+    val_dbl= .5 * ( (double)rgb1[cind] + (double)rgb2[cind] );
+    val_int= (int)(val_dbl + 0.5);
+    if ( val_int < 0 )
+     val_int= 0;
+    if ( val_int > 255 )
+     val_int= 255;
+    rgb[cind]= val_int;
+ }
+
+ threedpoint_arr[threedpoint_ind].xyz[0]= xyz[0];
+ threedpoint_arr[threedpoint_ind].xyz[1]= xyz[1];
+ threedpoint_arr[threedpoint_ind].xyz[2]= xyz[2];
+ threedpoint_arr[threedpoint_ind].rgb[0]= rgb[0];
+ threedpoint_arr[threedpoint_ind].rgb[1]= rgb[1];
+ threedpoint_arr[threedpoint_ind].rgb[2]= rgb[2];
+
+ imagepoint_arr= 0;
+ imagepoint_nbr= 0;
+
+ /*
+ Add pixel from image 1
+ to the definition of the 3D point
+ */
+
+ if ( imagepoint_nbr == 0 ) {
+    imagepoint_arr= (sfm_imagepoint_struct *)calloc(imagepoint_nbr+1,sizeof(sfm_imagepoint_struct));
+ }
+ else {
+    imagepoint_arr= (sfm_imagepoint_struct *)realloc(imagepoint_arr,(imagepoint_nbr+1)*sizeof(sfm_imagepoint_struct));
+ }
+ imagepoint_ind= imagepoint_nbr;
+ imagepoint_nbr++;
+ imagepoint.camera_ind= camera1_ind;
+ imagepoint.feat_ind=-1;
+ imagepoint.x= x1;
+ imagepoint.y= y1;
+ imagepoint_arr[imagepoint_ind]= imagepoint;
+
+ /*
+ Add pixel from image 2
+ to the definition of the 3D point
+ */
+
+ if ( imagepoint_nbr == 0 ) {
+    imagepoint_arr= (sfm_imagepoint_struct *)calloc(imagepoint_nbr+1,sizeof(sfm_imagepoint_struct));
+ }
+ else {
+    imagepoint_arr= (sfm_imagepoint_struct *)realloc(imagepoint_arr,(imagepoint_nbr+1)*sizeof(sfm_imagepoint_struct));
+ }
+ imagepoint_ind= imagepoint_nbr;
+ imagepoint_nbr++;
+ imagepoint.camera_ind= camera2_ind;
+ imagepoint.feat_ind=-1;
+ imagepoint.x= x2;
+ imagepoint.y= y2;
+ imagepoint_arr[imagepoint_ind]= imagepoint;
+
+ threedpoint_arr[threedpoint_ind].imagepoint_arr= imagepoint_arr;
+ threedpoint_arr[threedpoint_ind].imagepoint_nbr= imagepoint_nbr;
+
+ /*
+ Make sure pixel from image 1 knows about 3D point
+ */
+
+ if ( pixel2threedpoint_arr[camera1_ind][pixel1] != -1 ) {
+    mvs10_error_handler("mvs_add_match");
+ }
+ pixel2threedpoint_arr[camera1_ind][pixel1]= threedpoint_ind;
+
+ /*
+ Make sure pixel from image 2 knows about 3D point
+ */
+
+ if ( pixel2threedpoint_arr[camera2_ind][pixel2] != -1 ) {
+    mvs10_error_handler("mvs_add_match");
+ }
+ pixel2threedpoint_arr[camera2_ind][pixel2]= threedpoint_ind;
+
+ END:
+
+ (*pthreedpoint_arr)= threedpoint_arr;
+ (*pthreedpoint_nbr)= threedpoint_nbr;
+ (*ppixel2threedpoint_arr)= pixel2threedpoint_arr;
+
+}
