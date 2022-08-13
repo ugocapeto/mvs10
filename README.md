@@ -1,25 +1,32 @@
-# dmag9b
+# mvs10
 
 Written and tested on Ubuntu 22.04.
 
-Improve the quality of depth maps (joint bilateral filter).
+mvs10 builds a dense reconstruction of a 3D scene from a set of pictures.
 
-This repo is an implementation of:
+mvs10's workflow is as follows:
+- Initialize the dense with 3D reconstruction with the sparse 3D reconstruction contained in the nvm file
+- For each pair of images/cameras
+-- Rectify the images using code similar to Epipolar Rectification 9b (ER9b)
+-- Compute the disparity map using code similar to Depth Map Automatic Generator 5 (DMAG5)
+-- Add the matches (pairs of image points) coming from the disparity map to the 3D reconstruction
+-- Remove image points for which the reprojection error is too large
+- Remove 3D points (also known as tracks in the literature) for which the number of image points is too low
 
-["The Fast Bilateral Solver" by Jonathan T. Barron and Ben Poole](http://www.cs.berkeley.edu/~barron/BarronPoole2015.pdf)
+To create the executable, compile the code in directory "mvs10" using "make -f Makefile_g/Makefile_O" and then go into the "main" directory and create the exec using "make".
 
-To create the executable, compile the code in directory "dmag9b" using "make -f Makefile_g/Makefile_O" and then go into the "main" directory and create the exec using "make".
+Test cases are given in the "test" directory under main. Only the input file mvs10_input.txt is provided since mvs10 needs the output of sfm10 as input. For a given test case, copy all the files in the sfm10 corresponding directory (after sfm10 has been run, of course) and then run mvs10.
 
-Test cases are given in the "test" directory.
+Info about mvs10 (theory behind it and how to use it) can be found here:
 
-Info about dmag9b (theory behind it and how to use it) can be found here:
+[Multi View Stereo 10 (MVS10)](http://3dstereophoto.blogspot.com/2016/04/multi-view-stereo-10-mvs10.html)
 
-[Depth Map Automatic Generator 9b (DMAG9b)](https://3dstereophoto.blogspot.com/2015/12/depth-map-automatic-generator-9b-dmag9b.html)
+Dependencies (check the Makefile in main):
 
-[Depth Map Improvement Using The Fast Bilateral Solver](https://www.dropbox.com/s/i5vpf5f6jnudpns/fast_bilateral_solver_dmag9b.pdf?dl=0)
+common repo
 
-[Fast Bilateral-Space Stereo](https://www.dropbox.com/s/ke46mg8pkyou7s2/fast_bilateral_space_stereo.pdf?dl=0)
+dmag5 repo
 
-Dependencies (check the Makefiles):
+er9b repo
 
-"common" repo
+sfm10 repo
